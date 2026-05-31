@@ -2,17 +2,52 @@ const mineflayer = require('mineflayer');
 const readline = require('readline');
 
 // ===== CONFIG JO TU CHANGE KAR SAKTA HAI =====
-const SERVER_HOST     = 'OreSMPSeason9.aternos.me';
-const SERVER_PORT     = 47257;
+const SERVER_HOST     = 'McGamers.aternos.me';
+const SERVER_PORT     = 45486;
 const BOT_USERNAME    = 'NoTmeowl1';
 const MC_VERSION      = '1.16.5';
 const DEFAULT_COMMAND = '/register ajjubai94';
 
 // yahan se random chat ON/OFF karo
-const ENABLE_RANDOM_CHAT = true;    // true = on, false = off
+const ENABLE_RANDOM_CHAT = false;    // true = on, false = off
 
 const OWNER_NAME      = 'NoTmeowl';
 // ============================================
+
+// ===== AUTO SLEEP AT NIGHT FEATURE (FIXED) =====
+const BED_SLEEP_CHECK_INTERVAL = 5000;
+let hasNoBedWarning = false;
+
+function autoSleepAtNight(bot) {
+  setInterval(() => {
+    const time = bot.time.timeOfDay;
+    const isNight = time > 13000 && time < 23000;
+
+    if (isNight && !bot.isSleeping) {
+      const beds = bot.findBlocks({
+        matching: (block) => block.name && (block.name.includes('bed') || block.name.endsWith('_bed')),
+        maxDistance: 20,
+        count: 10
+      });
+
+      if (beds.length > 0) {
+        const bedBlock = bot.blockAt(beds[0]);
+        hasNoBedWarning = false;
+        bot.chat('Going to sleep! Good night! 🌙');
+        bot.sleep(bedBlock).catch(err => console.log('Sleep error:', err.message));
+      } else {
+        if (!hasNoBedWarning) {
+          hasNoBedWarning = true;
+          console.log('No bed found within 20 blocks! Place a bed nearby.');
+          bot.chat('No bed nearby! Please place a bed within 20 blocks of me! 🛌');
+        }
+      }
+    } else {
+      hasNoBedWarning = false;
+    }
+  }, BED_SLEEP_CHECK_INTERVAL);
+}
+// ================================================
 
 function createBot () {
   const bot = mineflayer.createBot({
@@ -49,6 +84,9 @@ function createBot () {
         bot.chat(DEFAULT_COMMAND);
       }, 1000);
     }
+
+    // AUTO SLEEP AT NIGHT - starts checking from spawn
+    autoSleepAtNight(bot);
 
     // movement
     bot.on('move', function () {
@@ -98,7 +136,7 @@ function createBot () {
     // === Break + Place block loop (every 10 minutes) ===
     setInterval(async () => {
       try {
-        bot.clearControlStates(); // ruk ja thodi der
+        bot.clearControlStates();
 
         const basePos = bot.entity.position.offset(0, -1, 0);
         const block = bot.blockAt(basePos);
@@ -108,9 +146,8 @@ function createBot () {
         }
 
         console.log('Trying to break:', block.name);
-        await bot.dig(block); // break karega
+        await bot.dig(block);
 
-        // block.name -> item.name mapping (grass_block -> dirt, etc.)
         let targetItemName = block.name;
         if (block.name === 'grass_block') targetItemName = 'dirt';
 
@@ -133,7 +170,7 @@ function createBot () {
       } catch (e) {
         console.log('Place loop error:', e.message);
       }
-    }, 10 * 60 * 1000); // 10 minutes
+    }, 10 * 60 * 1000);
   });
 
   // Game se control: OWNER_NAME likhe "!bot msg"
